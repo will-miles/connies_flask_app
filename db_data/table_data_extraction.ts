@@ -91,5 +91,5 @@ Arr.forEach((style) => {
   const cragsFiltered = [...new Set(crags)];
   console.log(cragsFiltered[0]);
 
-  writeFile(`../${style}_crags.json`, JSON.stringify(cragsFiltered));
+  writeFile(`./jsons/${style}_crags.json`, JSON.stringify(cragsFiltered));
 });

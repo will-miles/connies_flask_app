@@ -1,7 +1,8 @@
 import math
-from boto3.dynamodb.types import TypeDeserializer
+from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 
-serializer = TypeDeserializer()
+deserializer = TypeDeserializer()
+serializer = TypeSerializer()
 
 def deserialize(data):
     if isinstance(data, list):
@@ -9,9 +10,21 @@ def deserialize(data):
 
     if isinstance(data, dict):
         try:
-            return serializer.deserialize(data)
+            return deserializer.deserialize(data)
         except TypeError:
             return {k: deserialize(v) for k, v in data.items()}
+    else:
+        return data
+
+def serialize(data):
+    if isinstance(data, list):
+        return [serialize(v) for v in data]
+
+    if isinstance(data, dict):
+        try:
+            return serializer.serialize(data)
+        except TypeError:
+            return {k: serialize(v) for k, v in data.items()}
     else:
         return data
 
