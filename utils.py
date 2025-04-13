@@ -1,6 +1,8 @@
 import math
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 import aws_controller
+import os
+import requests
 
 deserializer = TypeDeserializer()
 serializer = TypeSerializer()
@@ -60,5 +62,16 @@ def getAndFilterCrags(lat, lon, radius, style):
 
     valid_crags_iterator = filter(check_distance, matchingCrags)
 
-    return valid_crags = list(valid_crags_iterator)
+    return list(valid_crags_iterator)
+
+def addWeatherToCrags(crags):
+    # now = datetime.now(timezone.utc)
+    # midnight = now.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
+    meteoblueApiKey = os.environ['METEOBLUE_API_KEY']
+    print(os.environ)
+
+    for crag in [crags[0]]:
+        if 'time_last_weather' not in crag: # TODO if || crag['time_last_weather'] < midnight
+            weatherResponse = requests.get('https://my.meteoblue.com/packages/basic-day', params={'apikey': meteoblueApiKey, 'lat': crag['lat'], 'lon': crag['long'], 'format': 'json'})
+
 
