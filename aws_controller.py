@@ -8,3 +8,9 @@ def get_crags(style):
     KeyConditionExpression='climbing_style = :climbing_style',
     ExpressionAttributeValues={":climbing_style":{"S": style}},
     )
+
+def put_crag(crag):
+    return dynamo_client.put_item(
+        TableName='crags',
+        Item=crag
+    )

@@ -3,6 +3,8 @@ from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 import aws_controller
 import os
 import requests
+import datetime
+from decimal import Decimal
 
 deserializer = TypeDeserializer()
 serializer = TypeSerializer()
@@ -23,7 +25,7 @@ def deserialize(data):
 # converts list/dict to dynamodb object
 def serialize(data):
     if isinstance(data, list):
-        return [serialize(v) for v in data]
+        return {'L':[serialize(v) for v in data]}
 
     if isinstance(data, dict):
         try:
@@ -31,7 +33,7 @@ def serialize(data):
         except TypeError:
             return {k: serialize(v) for k, v in data.items()}
     else:
-        return data
+        return serializer.serialize(Decimal(str(data)) if isinstance(data, float) else data)
 
 # calculates distance between 2 lat,long coordinates
 def getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2):
@@ -68,10 +70,19 @@ def addWeatherToCrags(crags):
     # now = datetime.now(timezone.utc)
     # midnight = now.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
     meteoblueApiKey = os.environ['METEOBLUE_API_KEY']
-    print(os.environ)
 
-    for crag in [crags[0]]:
-        if 'time_last_weather' not in crag: # TODO if || crag['time_last_weather'] < midnight
-            weatherResponse = requests.get('https://my.meteoblue.com/packages/basic-day', params={'apikey': meteoblueApiKey, 'lat': crag['lat'], 'lon': crag['long'], 'format': 'json'})
+    for crag in crags:
+        # print(serialize(crag))
+        if 'time_last_weather' not in crag: # TODO if || crag['time_last_weather'] < some hours ago
+            print('getting weather for ' + crag['crag_name'])
+            weatherResponse = requests.get('https://my.meteoblue.com/packages/basic-day', params={'apikey': meteoblueApiKey, 'lat': crag['lat'], 'lon': crag['long'], 'format': 'json'}).json()
 
+            if 'data_day' in weatherResponse:
+                print('updating dynamo weather for ' + crag['crag_name'])
+                crag['time_last_weather'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
+                cragToPut = serialize(crag)
+                cragToPut['M']['weather_data'] = {'M': serialize(weatherResponse['data_day'])}
+                putRes = aws_controller.put_crag(cragToPut['M'])
+
+                crag['weather_data'] = weatherResponse['data_day']
