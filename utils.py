@@ -67,18 +67,13 @@ def getAndFilterCrags(lat, lon, radius, style):
     return list(valid_crags_iterator)
 
 def addWeatherToCrags(crags):
-    # now = datetime.now(timezone.utc)
-    # midnight = now.replace(hour = 0, minute = 0, second = 0, microsecond = 0)
     meteoblueApiKey = os.environ['METEOBLUE_API_KEY']
 
     for crag in crags:
-        # print(serialize(crag))
         if 'time_last_weather' not in crag: # TODO if || crag['time_last_weather'] < some hours ago
-            print('getting weather for ' + crag['crag_name'])
             weatherResponse = requests.get('https://my.meteoblue.com/packages/basic-day', params={'apikey': meteoblueApiKey, 'lat': crag['lat'], 'lon': crag['long'], 'format': 'json'}).json()
 
             if 'data_day' in weatherResponse:
-                print('updating dynamo weather for ' + crag['crag_name'])
                 crag['time_last_weather'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
                 cragToPut = serialize(crag)
