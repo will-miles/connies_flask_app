@@ -3,8 +3,9 @@ from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 import aws_controller
 import os
 import requests
-import datetime
+from datetime import datetime, date, time, timezone
 from decimal import Decimal
+import pytz
 
 deserializer = TypeDeserializer()
 serializer = TypeSerializer()
@@ -69,15 +70,105 @@ def getAndFilterCrags(lat, lon, radius, style):
 def addWeatherToCrags(crags):
     meteoblueApiKey = os.environ['METEOBLUE_API_KEY']
 
+    tz = pytz.timezone("Europe/London")
+    the_date = date.today()
+    midnight_without_tzinfo = datetime.combine(the_date, time())
+    midnight_with_tzinfo = tz.localize(midnight_without_tzinfo)
+    utc = midnight_with_tzinfo.astimezone(pytz.utc)
+
     for crag in crags:
-        if 'time_last_weather' not in crag: # TODO if || crag['time_last_weather'] < some hours ago
+
+        lastUpdated = datetime.fromisoformat(crag['time_last_weather'])
+        midnightTodayUkUTC = midnight_with_tzinfo.astimezone(pytz.utc)
+
+        if 'time_last_weather' not in crag or lastUpdated < midnightTodayUkUTC:
+
+            print(lastUpdated)
+            print(midnightTodayUK)
+
             weatherResponse = requests.get('https://my.meteoblue.com/packages/basic-day', params={'apikey': meteoblueApiKey, 'lat': crag['lat'], 'lon': crag['long'], 'format': 'json'}).json()
 
             if 'data_day' in weatherResponse:
-                crag['time_last_weather'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                crag['time_last_weather'] = datetime.now(timezone.utc).isoformat()
+                # crag['weather_data']['weather_score'] = calculateWeatherScore(crag)
 
                 cragToPut = serialize(crag)
                 cragToPut['M']['weather_data'] = {'M': serialize(weatherResponse['data_day'])}
                 putRes = aws_controller.put_crag(cragToPut['M'])
 
                 crag['weather_data'] = weatherResponse['data_day']
+
+idealConditions = {
+    'boulder': {
+        'temp': 5,
+        'wind': [3.4, 10.7],
+        'precip': 0,
+        'humidity': 20,
+    },
+    'sport': {
+        'temp': 10,
+        'wind': [3.4, 10.7],
+        'precip': 0,
+        'humidity': 20,
+    },
+    'trad': {
+        'temp': 10,
+        'wind': [3.4, 10.7],
+        'precip': 0,
+        'humidity': 20,
+    },
+    'winter': {
+        'temp': -10,
+        'wind': [0, 7.9],
+        'precip': 0,
+        'humidity': 20,
+    }
+}
+
+def calculateWeatherScore(crag):
+    weatherData = crag["weather_data"]
+    ideals = idealConditions[crag["climbing_style"]]
+    scoreList = []
+    for index in list(range(0, 7)):
+        score = 0
+        # temp
+        if (weatherData["temperature_max"][index] > (ideals["temp"]-2) and weatherData["temperature_max"][index] < (ideals["temp"]+2)):
+            score += 5
+        elif (weatherData["temperature_max"][index] > (ideals["temp"]-4) and weatherData["temperature_max"][index] < (ideals["temp"]+4)):
+            score += 4
+        elif (weatherData["temperature_max"][index] > (ideals["temp"]-6) and weatherData["temperature_max"][index] < (ideals["temp"]+6)):
+            score += 3
+        elif (weatherData["temperature_max"][index] > (ideals["temp"]-8) and weatherData["temperature_max"][index] < (ideals["temp"]+8)):
+            score += 2
+        elif (weatherData["temperature_max"][index] > (ideals["temp"]-10) and weatherData["temperature_max"][index] < (ideals["temp"]+10)):
+            score += 1
+
+        # precip
+        if (weatherData["precipitation"][index] <= (ideals["precip"])):
+            score += 5
+        elif (weatherData["precipitation"][index] <= (ideals["precip"]+2)):
+            score += 4
+        elif (weatherData["precipitation"][index] <= (ideals["precip"]+4)):
+            score += 3
+        elif (weatherData["precipitation"][index] <= (ideals["precip"]+6)):
+            score += 2
+        elif (weatherData["precipitation"][index] <= (ideals["precip"]+8)):
+            score += 1
+
+        #
+        if (weatherData["relativehumidity_mean"][index] <= (ideals["humidity"])):
+            score += 5
+        elif (weatherData["relativehumidity_mean"][index] <= (ideals["humidity"]+20)):
+            score += 4
+        elif (weatherData["relativehumidity_mean"][index] <= (ideals["humidity"]+40)):
+            score += 3
+        elif (weatherData["relativehumidity_mean"][index] <= (ideals["humidity"]+60)):
+            score += 2
+        elif (weatherData["relativehumidity_mean"][index] <= (ideals["humidity"]+80)):
+            score += 1
+
+        # TODO account for wind speed and direction too
+
+        scoreList.append(score)
+
+    return scoreList

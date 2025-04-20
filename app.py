@@ -20,7 +20,9 @@ def get_crags():
     style = request.args.get('style')
 
     crags = utils.getAndFilterCrags(lat, lon, radius, style)
-    cragsWithWeather = utils.addWeatherToCrags(crags)
+    utils.addWeatherToCrags(crags)
+    for crag in crags:
+        crag["weather_score"] = utils.calculateWeatherScore(crag)
     return jsonify(crags)
 
 if __name__ == '__main__':
