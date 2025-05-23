@@ -68,8 +68,6 @@ def getAndFilterCrags(lat, lon, radius, style):
     return list(valid_crags_iterator)
 
 def addWeatherToCrags(crags):
-    meteoblueApiKey = os.environ['METEOBLUE_API_KEY']
-
     tz = pytz.timezone("Europe/London")
     the_date = date.today()
     midnight_without_tzinfo = datetime.combine(the_date, time())
@@ -83,8 +81,7 @@ def addWeatherToCrags(crags):
 
         if 'time_last_weather' not in crag or lastUpdated < midnightTodayUkUTC:
 
-            print(lastUpdated)
-            print(midnightTodayUK)
+            meteoblueApiKey = aws_controller.get_secret('my.meteoblue.com/packages/basic-day')['METEOBLUE_API_KEY']
 
             weatherResponse = requests.get('https://my.meteoblue.com/packages/basic-day', params={'apikey': meteoblueApiKey, 'lat': crag['lat'], 'lon': crag['long'], 'format': 'json'}).json()
 
@@ -125,6 +122,7 @@ idealConditions = {
     }
 }
 
+# Calculates and appends a score depending on how good the conditions will be on each day
 def calculateWeatherScore(crag):
     weatherData = crag["weather_data"]
     ideals = idealConditions[crag["climbing_style"]]

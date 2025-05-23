@@ -1,5 +1,6 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, abort
 import utils
+import aws_controller
 from flask_cors import CORS, cross_origin
 
 app = Flask(__name__)
@@ -18,6 +19,11 @@ def get_crags():
     lon = request.args.get('lon')
     radius = request.args.get('radius')
     style = request.args.get('style')
+    trueApiKey = aws_controller.get_secret('/get-crags')['GET_CRAGS_API_KEY']
+    requestApiKey = request.args.get('api_key')
+
+    if requestApiKey != trueApiKey:
+        return abort(403)
 
     crags = utils.getAndFilterCrags(lat, lon, radius, style)
     utils.addWeatherToCrags(crags)
